@@ -1,4 +1,3 @@
-
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from typing import Any
@@ -17,24 +16,25 @@ def list_ec2_instances(region: str | None = None) -> dict[str, Any]:
     """
 
     session = boto3.Session()
-    selected_region = region or session.region_name
+    selected_region = (region or session.region_name or "").strip()
 
     if not selected_region:
         raise ValueError(
-            "No AWS region configured. Configure a default region "
-            "or provide one when calling this tool."
+            "No AWS region configured. Provide a region or configure "
+            "a default AWS region."
         )
-
-    ec2 = session.client("ec2", region_name=selected_region)
 
     instances = []
 
     try:
+        ec2 = session.client("ec2", region_name=selected_region)
+
         paginator = ec2.get_paginator("describe_instances")
 
         for page in paginator.paginate():
             for reservation in page["Reservations"]:
                 for instance in reservation["Instances"]:
+
                     name = next(
                         (
                             tag["Value"]
@@ -57,9 +57,32 @@ def list_ec2_instances(region: str | None = None) -> dict[str, Any]:
                         }
                     )
 
-    except (ClientError, BotoCoreError) as error:
+    except ClientError as error:
+        error_code = error.response.get("Error", {}).get(
+            "Code", "Unknown"
+        )
+
+        if error_code in {
+            "AccessDenied",
+            "AccessDeniedException",
+            "UnauthorizedOperation",
+            "AuthFailure",
+        }:
+            raise PermissionError(
+                "AWS denied permission to list EC2 instances. "
+                "Ensure the configured IAM identity has "
+                "ec2:DescribeInstances permission."
+            ) from error
+
         raise RuntimeError(
-            f"Unable to retrieve EC2 instances: {error}"
+            f"AWS EC2 request failed in region "
+            f"'{selected_region}' ({error_code})."
+        ) from error
+
+    except BotoCoreError as error:
+        raise RuntimeError(
+            f"Unable to configure or communicate with AWS EC2 "
+            f"in region '{selected_region}': {error}"
         ) from error
 
     return {
@@ -71,4 +94,3 @@ def list_ec2_instances(region: str | None = None) -> dict[str, Any]:
 
 if __name__ == "__main__":
     mcp.run()
-

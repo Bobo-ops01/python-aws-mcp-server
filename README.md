@@ -63,3 +63,22 @@ For live AWS integration, the configured AWS identity requires:
 - [x] Execution tested with mocked EC2 data
 - [ ] Live AWS integration
 - [ ] Additional AWS tools
+## AWS Error Handling
+
+The EC2 tool handles the following failure scenarios:
+
+- Missing AWS region configuration.
+- Insufficient AWS permissions.
+- AWS service/API errors.
+- AWS connection failures.
+
+The tool provides descriptive error messages to help troubleshoot problems.
+
+## Additional Tests
+
+Run the error-handling tests:
+
+    python -m unittest tests.test_error_handling -v
+
+All tests use mocked AWS responses. No live AWS account or EC2 resources are required.
+
